@@ -1,5 +1,4 @@
 //#region Declarações
-
 var config = {
     pathStroke: 2,
     pointRadius: 7
@@ -10,20 +9,12 @@ var defaultHitOptions = {
 	fill: true,
 	tolerance: 5
 };
-var segmentPointHitOptions = { segments: true, stroke: false, fill: false, tolerance: 1 };
-var pointsControl = {
-    points: [],
-    controls: [],
-};
+var pointHitOptions = { segments: false, stroke: false, fill: true, tolerance: 1 };
+var pointsControl = [];
 var optionSelected = 1;
 var selectedHit;
-
-var pathsMap = {
-    'bezier': null,
-    'hermite': null ,
-    'bspline': null,
-    'bspline-cubic': null
-};
+var path;
+var tipoCurva = "bezier"; // inicializando
 
 //#endregion
 
@@ -57,16 +48,7 @@ function onMouseDrag(event) {
                 selectedHit.item.data.segment.point += delta;
             }
 
-            var label = '';
-            switch (selectedHit.item.data.class) {
-                case 'points':
-                    label = 'Point ';
-                    break;
-                case 'controls':
-                    label = 'Control Point ';
-                    break;
-            }
-            selectedHit.item.data.text.content = label + '(' + selectedHit.item.position.x + ', ' + selectedHit.item.position.y + ')';
+            selectedHit.item.data.text.content = '(' + selectedHit.item.position.x + ', ' + selectedHit.item.position.y + ')';
         }
         
         calculaCurva();
@@ -83,24 +65,6 @@ function onMouseDown(event) {
         return;
     }
 
-    if (event.modifiers.shift) {
-        if (hitResult && hitResult.type == 'fill') {
-            var item = pointsControl[hitResult.item.data.class].find(function(i) { return i.data.id == hitResult.item.data.id; });
-            pointsControl[hitResult.item.data.class].splice(pointsControl[hitResult.item.data.class].indexOf(item), 1);
-            hitResult.item.remove();
-            if (hitResult.item.data.text) {
-                hitResult.item.data.text.remove();
-            }
-            
-            if (hitResult.item.data.segment) {
-                hitResult.item.data.segment.remove();
-            }
-
-            calculaCurva();
-        };
-        return;
-    }
-
     if (hitResult) {
         if (hitResult.type == 'fill' && !(hitResult.item instanceof PointText)) {
             selectedHit = hitResult;
@@ -108,49 +72,30 @@ function onMouseDown(event) {
         return;
     }
 
-    if (pointsControl.points.length < 2) {
-        pathsMap['bezier'].add(new Point(event.point.x , event.point.y));
-        
-        toAdd = Path.Circle({
-            center: event.point,
-            radius: config.pointRadius,
-            fillColor: paper.Color.random(),
-            data: {
-                id: Math.floor(Math.random() * 10000),
-                class: 'points',
-                text: new PointText({
-                    point: { x: event.point.x, y: event.point.y - 15 },
-                    content: 'Point ('  + event.point.x + ', ' + event.point.y + ')',
-                    justification: 'center'
-                }),
-                segment: pathsMap['bezier'].segments[pathsMap['bezier'].segments.length - 1]
-            }
-        });
-
-        pointsControl.points.push(toAdd);
-        calculaCurva();
-        return;
+    if ((tipoCurva == 'bezier' || tipoCurva == 'hermite') && pointsControl.length > 3) {
+        return
     }
 
-    if (pointsControl.points.length == 2 && pointsControl.controls.length < 2) {
-        toAdd = Path.Circle({
-            center: event.point,
-            radius: config.pointRadius,
-            fillColor: paper.Color.random(),
-            data: {
-                id: Math.floor(Math.random() * 10000),
-                class: 'controls',
-                text: new PointText({
-                    point: { x: event.point.x, y: event.point.y - 15 },
-                    content: 'Control Point ('  + event.point.x + ', ' + event.point.y + ')',
-                    justification: 'center'
-                })
-            }
-        });
-        pointsControl.controls.push(toAdd);
+    toAdd = Path.Circle({
+        center: event.point,
+        radius: config.pointRadius,
+        fillColor: paper.Color.random(),
+        data: {
+            id: Math.floor(Math.random() * 10000),
+            class: 'points',
+            text: new PointText({
+                point: { x: event.point.x, y: event.point.y - 15 },
+                content: '('  + event.point.x + ', ' + event.point.y + ')',
+                justification: 'center'
+            }),
+        }
+    });
+
+    pointsControl.push(toAdd);
+    if (pointsControl.length > 2) {
         calculaCurva();
-        return;
     }
+    return;
 }
 
 //#endregion
@@ -158,7 +103,6 @@ function onMouseDown(event) {
 //#region MyFunctions
 
 function calculaCurva() {
-    var tipoCurva = $('#tipo-curva').val();
     initializePath();
     switch (tipoCurva) {
         case 'bezier':
@@ -173,60 +117,43 @@ function calculaCurva() {
         case 'bspline-cubic':
             calculaBSpline(3);
             break;
-        default:
-            break;
     }
-}
-
-function hideDiffPaths(tipo) {
-    Object.keys(pathsMap).forEach(function(key) {
-        if (key !== tipo) {
-            if (pathsMap[key]) {
-                pathsMap[key].visible = false;
-            }
-        } else {
-            if (pathsMap[key]) {
-                pathsMap[key].visible = true;
-            }
-        }
-    });
 }
 
 function initializePath() {
-    var tipoCurva = $('#tipo-curva').val();
-    hideDiffPaths(tipoCurva);
-    if (tipoCurva != 'bezier' && pathsMap[tipoCurva]) {
-        pathsMap[tipoCurva].remove();
+    if (!path) {
+        path = new Path();
     }
-    if (tipoCurva == 'bezier' && !pathsMap[tipoCurva] || tipoCurva !== 'bezier') {
-        pathsMap[tipoCurva] = new Path();
+
+    if (path) {
+        path.remove();
+        path = new Path();
     }
-    pathsMap[tipoCurva].strokeColor = 'orange';
-    pathsMap[tipoCurva].strokeWidth = config.pathStroke;
+    path.strokeColor = 'orange';
+    path.strokeWidth = config.pathStroke;
 }
 
 
 function calculaBezier() {
-    if (pointsControl.points.length >= 2) {
-        pathsMap['bezier'].segments.forEach(function(item, index) {
-            // remove os vetores que foram aplicados para resetar a curva
-            item.clearHandles();
-        });
-        if (pointsControl.controls.length == 1) {
+    if (pointsControl.length > 2) {
+        path.add(pointsControl[0].position.clone());
+        path.add(pointsControl[pointsControl.length -1].position.clone());
+
+        if (pointsControl.length == 3) {
             // aplica bezier quadrático
-            pathsMap['bezier'].segments.forEach(function(segment, index) {
+            path.segments.forEach(function(segment) {
                 var calculatedPoint = { 
-                    x: pointsControl.controls[0].position.x - segment.point.x,
-                    y: pointsControl.controls[0].position.y - segment.point.y,
+                    x: pointsControl[pointsControl.length -2].position.x - segment.point.x,
+                    y: pointsControl[pointsControl.length -2].position.y - segment.point.y,
                 };
                 segment.handleOut = calculatedPoint;
             });
-        } else if (pointsControl.controls.length == 2) {
+        } else if (pointsControl.length == 4) {
             // aplica bezier cúbico
-            pathsMap['bezier'].segments.forEach(function(segment, index) {
+            path.segments.forEach(function(segment, index) {
                 var calculatedPoint = { 
-                    x: pointsControl.controls[index].position.x - segment.point.x,
-                    y: pointsControl.controls[index].position.y - segment.point.y,
+                    x: pointsControl[index + 1].position.x - segment.point.x,
+                    y: pointsControl[index + 1].position.y - segment.point.y,
                 };
                 // necessário somente para o ponto
                 segment.handleIn = calculatedPoint;
@@ -237,24 +164,15 @@ function calculaBezier() {
 }
 
 function calculaHermite() {
-    if (pointsControl.controls.length < 1    || pointsControl.points.length < 2) {
+    if (pointsControl.length < 4) {
         return;
     }
-    console.log(pointsControl);
-    initializePath();
-    // view.size.width
-    // view.size.height
-    var P1 = { x: pointsControl.points[0].position.x / view.size.width, y: pointsControl.points[0].position.y / view.size.height  };
-    var P2 = { x: pointsControl.points[1].position.x / view.size.width, y: pointsControl.points[1].position.y / view.size.height  };
-    var T1 = { x: pointsControl.controls[0].position.x / view.size.width, y: pointsControl.controls[0].position.y / view.size.height };
-    var T2;
-    if (pointsControl.controls.length < 2) {
-        T2 = { x: pointsControl.points[1].position.x / view.size.width, y: pointsControl.points[1].position.y / view.size.height };
-    } else {
-        T2 = { x: pointsControl.controls[1].position.x / view.size.width, y: pointsControl.controls[1].position.y / view.size.height };
-    }
     var steps = 1;
-
+    var p1 = { x: pointsControl[0].position.x, y: pointsControl[0].position.y  };
+    var p2 = { x: pointsControl[1].position.x, y: pointsControl[1].position.y };
+    var t1 = { x: pointsControl[2].position.x, y: pointsControl[2].position.y };
+    var t2 = { x: pointsControl[3].position.x, y: pointsControl[3].position.y };
+    initializePath();
     for (var t = 0; t < steps; t+=0.01)
     {
         var s = t / steps;
@@ -262,60 +180,46 @@ function calculaHermite() {
         var h2 = -2 * Math.pow(s, 3) + 3 * Math.pow(s, 2);
         var h3 = Math.pow(s, 3) - 2* Math.pow(s, 2) + s;
         var h4 =  Math.pow(s, 3) -  Math.pow(s, 2);
-        var p = { x: 0, y: 0 };
 
-        p.x += h1 * P1.x;
-        p.y += h1 * P1.y;
+        var p = {x:0,y:0};
+        p.x += h1 * p1.x;
+        p.y += h1 * p1.y;
 
-        p.x += h2 * P2.x;
-        p.y += h2 * P2.y;
+        p.x += h2 * p2.x;
+        p.y += h2 * p2.y;
 
-        p.x += h3 * (T1.x - P1.x);
-        p.y += h3 * (T1.y - P1.y);
+        p.x += h3 * (t1.x - p1.x);
+        p.y += h3 * (t1.y - p1.y);
 
-        p.x += h4 * (T2.x - P2.x);
-        p.y += h4 * (T2.y - P2.y);
+        p.x += h4 * (t2.x - p2.x);
+        p.y += h4 * (t2.y - p2.y);
 
-        p = { x: p.x * view.size.width, y: p.y * view.size.height };
-        pathsMap['hermite'].add(new Point(p));
+        p = { x: p.x, y: p.y };
+        path.add(new Point(p));
+        
     }
     
 }
 
 function calculaBSpline(degree) {
-    if (pointsControl.points.length + pointsControl.controls.length < 4) {
+    if (pointsControl.length < 4) {
         return;
     }
-    var points = [
-        [ pointsControl.points[0].position.x, pointsControl.points[0].position.y ],
-        [ pointsControl.points[1].position.x, pointsControl.points[1].position.y ],
-        [ pointsControl.controls[0].position.x, pointsControl.controls[0].position.y ],
-        [ pointsControl.controls[1].position.x, pointsControl.controls[1].position.y ],
-    ];
+    // mapeamento para representação vetorial de um ponto (x,y)
+    var points = pointsControl.map(function(point) { return [point.position.x, point.position.y] });
     for(var t=0; t<1; t+=0.01) {
         var point = getBSplinePoint(t, degree, points);
-        if (degree == 2) {
-            pathsMap['bspline'].add(new Point(point[0], point[1]));
-        } else {
-            pathsMap['bspline-cubic'].add(new Point(point[0], point[1]));
-        }
+        path.add(new Point(point[0], point[1]));
     }
 }
-
-
-//#endregion
-
-initializePath();
-
-
 
 function getBSplinePoint(t, grau, pontos) {
     var i,j,s,l;
     var n = pontos.length;
     var d = pontos[0].length
   
-    if(grau < 1) throw new Error('degree must be at least 1 (linear)');
-    if(grau > (n-1)) throw new Error('degree must be less than or equal to point count - 1');
+    if(grau < 1) throw new Error('grau deve ser maior que 1');
+    if(grau > (n-1)) throw new Error('grau deve ser menor ou igual a Quantidade de pontos - 1');
   
     var tamanhos;
     if(!tamanhos) {
@@ -384,3 +288,28 @@ function getBSplinePoint(t, grau, pontos) {
   
     return result;
 }
+
+//#endregion
+
+function changeType(curva) {
+    var cleared = false;
+    if (!((tipoCurva == 'bspline' && curva == 'bspline-cubic') || (curva == 'bspline' && tipoCurva == 'bspline-cubic'))) {
+        clearDraw();
+        cleared = true;
+    }
+    tipoCurva = curva;
+
+    if (!cleared) {
+        calculaCurva();
+    }
+}
+
+function clearDraw() {
+    paper.project.activeLayer.removeChildren();
+    paper.view.draw();
+    pointsControl = [];
+}
+
+// set function to acess on index.html
+window.changeType = changeType;
+window.clearDraw = clearDraw;
