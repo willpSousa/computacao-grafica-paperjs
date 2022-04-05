@@ -168,11 +168,12 @@ function calculaHermite() {
         return;
     }
     var steps = 1;
-    var p1 = { x: pointsControl[0].position.x, y: pointsControl[0].position.y  };
+    var p1 = { x: pointsControl[0].position.x, y: pointsControl[0].position.y };
     var p2 = { x: pointsControl[1].position.x, y: pointsControl[1].position.y };
     var t1 = { x: pointsControl[2].position.x, y: pointsControl[2].position.y };
     var t2 = { x: pointsControl[3].position.x, y: pointsControl[3].position.y };
     initializePath();
+    
     for (var t = 0; t < steps; t+=0.01)
     {
         var s = t / steps;
@@ -196,7 +197,6 @@ function calculaHermite() {
 
         p = { x: p.x, y: p.y };
         path.add(new Point(p));
-        
     }
     
 }
@@ -230,7 +230,7 @@ function getBSplinePoint(t, grau, pontos) {
     }
   
     if(!nos) {
-      // criar vetor de nós com tamanho [n + grau + 1]
+
       var nos = [];
       for(i=0; i<n+grau+1; i++) {
         nos[i] = i;
@@ -242,21 +242,21 @@ function getBSplinePoint(t, grau, pontos) {
       nos.length-1 - grau
     ];
   
-    // remap t to the domain where the spline is defined
+
     var low  = nos[dominio[0]];
     var high = nos[dominio[1]];
     t = t * (high - low) + low;
   
     if(t < low || t > high) throw new Error('out of bounds');
   
-    // find s (the spline segment) for the [t] value provided
+
     for(s=dominio[0]; s<dominio[1]; s++) {
       if(t >= nos[s] && t <= nos[s+1]) {
         break;
       }
     }
   
-    // convert points to homogeneous coordinates
+
     var v = [];
     for(i=0; i<n; i++) {
       v[i] = [];
@@ -266,21 +266,21 @@ function getBSplinePoint(t, grau, pontos) {
       v[i][d] = tamanhos[i];
     }
   
-    // l (level) goes from 1 to the curve degree + 1
+
     var alpha;
     for(l=1; l<=grau+1; l++) {
-      // build level l of the pyramid
+
       for(i=s; i>s-grau-1+l; i--) {
         alpha = (t - nos[i]) / (nos[i+grau+1-l] - nos[i]);
   
-        // interpolate each component
+
         for(j=0; j<d+1; j++) {
           v[i][j] = (1 - alpha) * v[i-1][j] + alpha * v[i][j];
         }
       }
     }
   
-    // convert back to cartesian and return
+
     var result = result || [];
     for(i=0; i<d; i++) {
       result[i] = v[s][i] / v[s][d];
